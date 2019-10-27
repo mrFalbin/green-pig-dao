@@ -2,8 +2,8 @@
     "name": "falbin/green-pig-dao",
     "type": "library",
     "description": "database assistant",
-    "version": "1.0.0",
-    "minimum-stability": "stable",
+    "version": "1.1.0",
+    "minimum-stability": "dev",
     "authors": [
         {
             "name": "Falbin",
