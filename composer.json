@@ -3,6 +3,7 @@
     "type": "library",
     "description": "database assistant",
     "version": "1.0.0",
+    "minimum-stability": "stable",
     "authors": [
         {
             "name": "Falbin",
