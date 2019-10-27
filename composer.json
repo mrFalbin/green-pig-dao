@@ -1,0 +1,20 @@
+{
+    "name": "falbin/green-pig-dao",
+    "type": "library",
+    "description": "database assistant",
+    "authors": [
+        {
+            "name": "Falbin",
+            "email": "ifalbin@yandex.ru"
+        }
+    ],
+    "require": {
+        "php": "^5.4",
+        "another-vendor/package": "1.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "GreenPigDAO\\": ""
+        }
+    }
+}
