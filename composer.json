@@ -24,8 +24,7 @@
     },
     "scripts": {
         "post-update-cmd": [
-            "clear",
-            "echo \"\n\nInstallation Complete\""
+            "GreenPigDAO\\Composer\\ScriptHandler::myScript"
         ]
     }
 }
