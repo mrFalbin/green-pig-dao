@@ -25,7 +25,7 @@
     "scripts": {
         "post-update-cmd": [
             "clear",
-            "php -r \" echo 'Hello World!'; \""
+            "echo \"\n\nInstallation Complete\""
         ]
     }
 }
