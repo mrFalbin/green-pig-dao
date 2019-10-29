@@ -21,10 +21,5 @@
         "psr-4": {
             "GreenPigDAO\\": ""
         }
-    },
-    "scripts": {
-        "post-update-cmd": [
-            "GreenPigDAO\\Composer\\ScriptHandler::myScript"
-        ]
     }
 }

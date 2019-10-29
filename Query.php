@@ -1,6 +1,72 @@
 <?php
 namespace GreenPigDAO;
 
+/**
+ *
+ *                             ╔═══╗╔═══╗╔═══╗╔═══╗╔╗─╔╗────╔═══╗╔══╗╔═══╗
+ *                             ║╔══╝║╔═╗║║╔══╝║╔══╝║╚═╝║────║╔═╗║╚╗╔╝║╔══╝
+ *                             ║║╔═╗║╚═╝║║╚══╗║╚══╗║╔╗─║────║╚═╝║─║║─║║╔═╗
+ *                             ║║╚╗║║╔╗╔╝║╔══╝║╔══╝║║╚╗║────║╔══╝─║║─║║╚╗║
+ *                             ║╚═╝║║║║║─║╚══╗║╚══╗║║─║║────║║───╔╝╚╗║╚═╝║
+ *                             ╚═══╝╚╝╚╝─╚═══╝╚═══╝╚╝─╚╝────╚╝───╚══╝╚═══╝
+ *
+ *
+ *                                                                  MMMM:
+ *                                                                 MMMMMMMMMA9
+ *                                                                 GMMMMMMMMMMMMMM
+ *                                                                  SMMMMMMMMMMMMMMM
+ *                                                                        ,5HMMMMMMMM
+ *                                                                            MMMMMMMM
+ *                                                                            GMMMMMMMM
+ *                                                                            &MMMMMMMM
+ *                                                 23S,.                      MMMMMMMMM
+ *                                              MMMMMMMMMMMMMMMMM3i          MMMMMMMMMM
+ *                                             MMMMMMMMMMMMMMMMMMMMMMMMMM3AMMMMMMMMMMMH
+ *                                         MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                                        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                                        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                                       MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                                      MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                                HMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMi
+ *                            MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *                       rMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM 9MMM2
+ *                   :MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM,
+ *                 MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *              rMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMB
+ *            iMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM5
+ *           MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM.
+ *           MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMr
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *      MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *     MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *    MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMi
+ *   MM  MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *   M   MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *  3M   MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ *  9M   MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ * .MM   sMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+ * MMM    MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM5                                    5HHHG
+ * MM     MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM                         HH       HHHHHHH
+ *        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM                       9HHHA    HHHHHHHH5
+ *        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM   MMMMMMMMMMMMMMMMM                     HHHHHHHHHHHHHHHHHH  9HHHHH5
+ *         MMMMMMMMMMMMM3MMMMMMMMMMMMMA     3MMMMMMM MMMMMMMM                   5HHHHHHHHHHHHHHHHHHHHHHHHHHH
+ *          MMMMMMMM     ,MMMMMMMMMMM        MMMMMMM MMMMMMMM                  HHHHHHHHHHHHHHHHHHHHHHHHHHHH
+ *          MMMMMMMh      AMMMMMMMMM         ;MMMMMM SMMMMMMM                ;HHHHHHHHHHHHHHHHHHHHHHHHHHA
+ *          MMMMMMM       hMMMMMMM            MMMMMM. MMMMMMM                 H2   HHHHHHHHHHHHHHHHHHHHHH
+ *          AMMMMMM       MMMMMMMM            MMMMMM  MMMMMMM                      HHHHHHHHHHHHHHHHHHHHHHH9
+ *          3MMMMMM      2MMMMMMM            HMMMMMM  MMMMMMM                       HHHHHHHHHHHHHHHHHHHHHHH
+ *          9MMMMMM      MMMMMMM             MMMMMMM  MMMMMMM                       AHHHHHHHHHHHHHHHHHHHHHH
+ *          MMMMMMM     MMMMMMMM             MMMMMMM  MMMMMMM                        HHHHHHHHHHHHHHHHHHHHH9  iHS
+ *          MMMMMMM     MMMMMMMM             MMMMMMi  MMMMMMM                         HHHHHHHHHHHHHHHHHHHHHHhh
+ *          MMMMMMM    BMMMMMMMA            MMMMMMM   MMMMMMM                          HHHHHHHHHHHHHHHHHH
+ *          MMMMMMM    MMMMMMMMM           MMMMMMMX   MMMMMMM                         AA HHHHHHHHHHHHHH3
+ *         9MMMMMMM&   MMMMMMMMM           MMMMMMMi   MMMMMMM                        &H  Hi         HS Hr
+ *         MMMMMMMMM                       MMMMMMMMM ;MMMMMMM                        &  H&          H&  Hi
+ *
+ */
 
 class Query
 {
@@ -189,22 +255,12 @@ class Query
             }
             $aliasTable = "table_" . $this->genStr();
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable ORDER BY ". implode(",", $this->sort);
-
-//            print_r($sql);
-//            var_dump($binds);
-//          return 0;
-
             $rawData = $this->db->fetchAll($sql, $binds);
             $aggregateData = $this->aggregator($options, $rawData);
             $this->_afterRequest($rawData, $aggregateData, $sql, $binds, $startQuery);
             return $aggregateData;
-        // --- Простой запрос, без агрегации ---
+            // --- Простой запрос, без агрегации ---
         } else {
-
-            echo '<pre>';
-            print_r($sql);
-            return false;
-
             // --- Если $options - строка, то это PK для пагинации ---
             if (is_string($options) && is_array($this->pagination)) {
                 $sql = $this->_processingPagination($options, $sql, $binds);
@@ -615,46 +671,92 @@ class Query
 
 
 
-
-
-    public function smartWhere($aliasWhere, $aliasJoin, $options, $where, $union = null, $whereMore = [])
+    public function smartWhere($aliasWhere, $aliasJoin, $options, $where, $union = null, $whereMore = null)
     {
+        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
+        $this->_validSmartWhere($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore);
         $cJn = new CollectionJoin($this->settings);
         $where->setRaw( $this->_smartWhere($cJn, $where->getRaw(), $options) );
+        if (is_string($union)) {
+            if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+            else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
+        }
         $this->_where($aliasWhere, $where, $isWhere = true);
         $this->join($aliasJoin, $cJn);
-
-//        if ($union) {
-//            if ()
-//            $where-> $whereMore
-//        }
-
         return $this;
     }
 
+    private function _validSmartWhere($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore)
+    {
+        if (!is_string($aliasWhere) || !is_string($aliasJoin) || !is_array($options) || !$this->isClass($where, 'Where')) {
+            throw new \Exception('Параметры aliasWhere и aliasJoin должны быть строкой, options далжен быть массивом, а where должен быть экземпляром класса Where.');
+        }
+        if ($union) {
+            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
+                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
+            }
+            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
+        }
+    }
 
     private function _smartWhere(&$cJn, $whRaw, $options)
     {
+        // В теории внутри скобки только один знак OR или AND, но проверяем на случий, если была ошибка
+        // или правили сырое выражение руками.
+        $isOr = false;
+        $isAnd = false;
+        $arrColumns = [];
+        foreach ($whRaw as $wr) {
+            if (is_string($wr)) {
+                $union = mb_strtolower(trim($wr));
+                if ($union == 'or') $isOr = true;
+                if ($union == 'and') $isAnd = true;
+            }
+            if (is_array($wr) && is_string($wr[0])) $arrColumns[] = $wr[0];
+        }
+        if ($isOr && $isAnd) throw new \Exception('В рамках одной скобки связь может быть или только AND или только OR.');
+        $arrColumns = array_count_values($arrColumns);
+        // ---
         $rez = [];
         foreach ($whRaw as $wr) {
             if (!is_string($wr)) {
                 if (is_array($wr[0])) {
                     $rez[] = $this->_smartWhere($cJn, $wr, $options);
                 } else {
-                    $table = $options[$wr[0]][0];
-                    $column = $options[$wr[0]][1];
-                    $outColumn = $options[$wr[0]][2];
-                    $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
-                    $wr[0] = "$aliasTable.$column";
-                    $rez[] = $wr;
+                    if ($isAnd && $arrColumns[$wr[0]] > 1) {
+                        $table = $options[$wr[0]][0];
+                        $column = $options[$wr[0]][1];
+                        $outColumn = $options[$wr[0]][2];
+                        $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
+                        $buf = explode('.', $wr[0]);
+                        if (count($buf) > 1) $wr[0] = $aliasTable . '.' . $buf[1];
+                        else $wr[0] = $aliasTable . '.' . $wr[0];
+                        $rez[] = $wr;
+                    } else $rez[] = $wr;
                 }
             } else $rez[] = $wr;
         }
         return $rez;
     }
 
-
-
-
+//    private function _smartWhere(&$cJn, $whRaw, $options)
+//    {
+//        $rez = [];
+//        foreach ($whRaw as $wr) {
+//            if (!is_string($wr)) {
+//                if (is_array($wr[0])) {
+//                    $rez[] = $this->_smartWhere($cJn, $wr, $options);
+//                } else {
+//                    $table = $options[$wr[0]][0];
+//                    $column = $options[$wr[0]][1];
+//                    $outColumn = $options[$wr[0]][2];
+//                    $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
+//                    $wr[0] = $aliasTable . '.' . $wr[0];
+//                    $rez[] = $wr;
+//                }
+//            } else $rez[] = $wr;
+//        }
+//        return $rez;
+//    }
 
 }

@@ -68,7 +68,7 @@ class Where
 
 
 	private function _expression($union, $expression) {
-		if (!is_array($expression) || count($expression) === 0) throw new Exception('Неверный операнд.');
+		if (!is_array($expression) || count($expression) === 0) throw new \Exception('Неверный операнд.');
     	if (is_string($expression[0])) {
     		$this->rawWhere = [$expression];
     	} else {
@@ -204,11 +204,11 @@ class Where
            else if (trim(mb_strtolower($element)) == 'and') $kindElement = 'and';
        }
        if (is_object($element)) {
-           throw new Exception("Ошибка в построении запроса. Работа с объектом недопустима, 
+           throw new \Exception("Ошибка в построении запроса. Работа с объектом недопустима, 
            необходимо использовать функцию getRaw для получения сырых данных.");
        }
        if ($kindElement) return $kindElement;
-       else throw new Exception('Ошибка в построении запроса.');
+       else throw new \Exception('Ошибка в построении запроса.');
    }
 
 }

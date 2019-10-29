@@ -11,7 +11,7 @@ trait BaseFunctions
         if (trim(strtolower($this->settings['nameDatabase'])) == 'oracle') $sql = " TO_DATE($aliasForStrDate, '$format') ";
         if (trim(strtolower($this->settings['nameDatabase'])) == 'mysql') $sql = " STR_TO_DATE($aliasForStrDate, '$format') ";
         if ($sql) return $sql;
-        else throw new Exception('В settings.php неверно указано название базы данных.');
+        else throw new \Exception('В settings неверно указано название базы данных.');
     }
 
 
