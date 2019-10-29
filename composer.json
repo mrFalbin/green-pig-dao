@@ -5,7 +5,7 @@
     "keywords": ["oracle", "mysql", "database", "orm", "dao"],
     "homepage": "http://doc.falbin.ru/greenpig/",
     "license": "MIT",
-    "minimum-stability": "dev",
+    "minimum-stability": "beta",
     "authors": [
         {
             "name": "Falbin",
