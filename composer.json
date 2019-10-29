@@ -2,21 +2,30 @@
     "name": "falbin/green-pig-dao",
     "type": "library",
     "description": "database assistant",
-    "version": "1.1.0",
+    "keywords": ["oracle", "mysql", "database", "orm", "dao"],
+    "homepage": "http://doc.falbin.ru/greenpig/",
     "license": "MIT",
     "minimum-stability": "dev",
     "authors": [
         {
             "name": "Falbin",
-            "email": "ifalbin@yandex.ru"
+            "email": "ifalbin@yandex.ru",
+            "homepage": "http://falbin.ru",
+            "role": "Developer"
         }
     ],
     "require": {
-        "php": "^5.4"
+        "php": ">=5.4.0"
     },
     "autoload": {
         "psr-4": {
             "GreenPigDAO\\": ""
         }
+    },
+    "scripts": {
+        "post-update-cmd": [
+            "clear",
+            "php -r \" echo 'Hello World!'; \""
+        ]
     }
 }
