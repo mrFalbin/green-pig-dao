@@ -2,6 +2,10 @@
 namespace GreenPigDAO;
 
 /**
+ *  author:        Falbin
+ *  email:         ifalbin@yandex.ru
+ *  homepage:      http://falbin.ru
+ *  documentation: https://falbin.ru/documentation/greenpig
  *
  *                             ╔═══╗╔═══╗╔═══╗╔═══╗╔╗─╔╗────╔═══╗╔══╗╔═══╗
  *                             ║╔══╝║╔═╗║║╔══╝║╔══╝║╚═╝║────║╔═╗║╚╗╔╝║╔══╝
@@ -255,9 +259,12 @@ class Query
             }
             $aliasTable = "table_" . $this->genStr();
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable ORDER BY ". implode(",", $this->sort);
-            $rawData = $this->db->fetchAll($sql, $binds);
-            $aggregateData = $this->aggregator($options, $rawData);
-            $this->_afterRequest($rawData, $aggregateData, $sql, $binds, $startQuery);
+            $aggregateData = [];
+            try {
+                $rawData = $this->db->fetchAll($sql, $binds);
+                $aggregateData = $this->aggregator($options, $rawData);
+                $this->_afterRequest($rawData, $aggregateData, $sql, $binds, $startQuery);
+            } catch (\Exception $e) { $this->_error($e, $sql, $binds); }
             return $aggregateData;
             // --- Простой запрос, без агрегации ---
         } else {
@@ -268,16 +275,20 @@ class Query
             }
             $aliasTable1 = "table_" . $this->genStr();
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable1 ORDER BY ". implode(",", $this->sort);
-            $rawData = $this->db->fetchAll($sql, $binds);
-            $this->_afterRequest($rawData, false, $sql, $binds, $startQuery);
-            return $rawData;
+            try {
+                $rawData = $this->db->fetchAll($sql, $binds);
+                $this->_afterRequest($rawData, false, $sql, $binds, $startQuery);
+                return $rawData;
+            } catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         }
     }
 
     private function _processingPagination($pk, $sql, $binds)
     {
         $aliasTable1 = "table_" . $this->genStr();
-        $result = $this->db->fetchRow("SELECT COUNT(distinct $aliasTable1.$pk) as total_count FROM ( $sql ) $aliasTable1", $binds);
+        try {
+            $result = $this->db->fetchRow("SELECT COUNT(distinct $aliasTable1.$pk) as total_count FROM ( $sql ) $aliasTable1", $binds);
+        } catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         //  В зависимости от настройки БД она может вернуть данные, приведя название колонок к нижнему или верхнему
         // регистру. Нам нужен первый (в данном случае единственный) столбец.
         $firstKey = array_keys($result);
@@ -297,21 +308,25 @@ class Query
 
     // $indexStart - включительно и начинается с 1
     // fetchAllPrimaryKey($sql, $binds, 'ID', 4, 2) );       1 2 3 4 5 6 7 8 9   Выдаст: 4, 5
-    // todo: переделать алиасы биндов (возможно неуникальны) и экранирование таблиц и столбцов !!!!!
     private function _fetchPKsOracle($sql, $binds, $primaryKey, $indexStart, $numberRowOnPage)
     {
         $timeStartQuery = microtime(true);
         $sqlOB = '';
         if ($this->sort) $sqlOB = "  ORDER BY ". implode(",", $this->sort);
         $indexEnd = $indexStart + $numberRowOnPage;
+        $aliasIndexStart = ':indexStart_'. $this->genStr();
+        $aliasindexEnd = ':indexEnd_'. $this->genStr();
         $sql = "select * from (
                   select rownum rnum, $primaryKey from (
                     select $primaryKey from ($sql) group by $primaryKey $sqlOB
                   )
-                ) where rnum >= :indexStart and rnum < :indexEnd";
-        $binds = array_merge($binds, ['indexStart' => $indexStart, 'indexEnd' => $indexEnd]);
-        $result = $this->db->fetchAll($sql, $binds);
+                ) where rnum >= $aliasIndexStart and rnum < $aliasindexEnd";
+        $binds = array_merge($binds, [$aliasIndexStart => $indexStart,
+            $aliasindexEnd => $indexEnd]);
+        try { $result = $this->db->fetchAll($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $sql,
             'binds' => $binds,
             'timeQuery' => (microtime(true) - $timeStartQuery)
@@ -326,10 +341,15 @@ class Query
         $aliasTable = "table_" . $this->genStr();
         $timeStartQuery = microtime(true);
         $indexStart--;
-        $sql = "select $primaryKey from ($sql) $aliasTable group by $primaryKey limit :indexStart, :numberRowOnPage";
-        $binds = array_merge($binds, ['indexStart' => $indexStart, 'numberRowOnPage' => $numberRowOnPage]);
-        $result = $this->db->fetchAll($sql, $binds);
+        $aliasIndexStart = ':indexStart_'. $this->genStr();
+        $aliasNumberRowOnPage = ':numberRowOnPage_'. $this->genStr();
+        $sql = "select $primaryKey from ($sql) $aliasTable group by $primaryKey limit $aliasIndexStart, $aliasNumberRowOnPage";
+        $binds = array_merge($binds, [$aliasIndexStart => $indexStart,
+            $aliasNumberRowOnPage => $numberRowOnPage]);
+        try { $result = $this->db->fetchAll($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $sql,
             'binds' => $binds,
             'timeQuery' => (microtime(true) - $timeStartQuery)
@@ -349,8 +369,10 @@ class Query
         $binds = $arrSqlBinds['binds'];
         // --- проверяем, чтобы возвращалась только 1 запись ---
         $sqlCheck = "SELECT COUNT(*) as total_count FROM ( $sql ) a";
-        $tc= $this->db->fetchRow($sqlCheck, $binds);
+        try { $tc = $this->db->fetchRow($sqlCheck, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sqlCheck, $binds); }
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $sqlCheck,
             'binds' => $binds,
             'timeQuery' => (microtime(true) - $startQuery)
@@ -362,9 +384,13 @@ class Query
         $totalCount = (int)$tc[$firstKey];
         if ($totalCount !== 1) throw new \Exception('В выборке может быть только одна запись.');
         // ---
-        $data = $this->db->fetchRow($sql, $binds);
+        try { $data = $this->db->fetchRow($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->_afterRequest($data, false, $sql, $binds, $startQuery);
-        return $nameColumn ? $data[$nameColumn] : $data;
+        if ($nameColumn) {
+            if (!array_key_exists($nameColumn, $data)) throw new \Exception('Колонки с таким именем не существует.');
+            else return $data[$nameColumn];
+        } else return $data;
     }
 
 
@@ -375,9 +401,13 @@ class Query
         $arrSqlBinds = $this->_genSqlBinds();
         $sql = $arrSqlBinds['sql'];
         $binds = $arrSqlBinds['binds'];
-        $data = $this->db->fetchRow($sql, $binds);
+        try { $data = $this->db->fetchRow($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->_afterRequest($data, false, $sql, $binds, $startQuery);
-        return $nameColumn ? $data[$nameColumn] : $data;
+        if ($nameColumn) {
+            if (!array_key_exists($nameColumn, $data)) throw new \Exception('Колонки с таким именем не существует.');
+            else return $data[$nameColumn];
+        } else return $data;
     }
 
     // =================================================================================================================
@@ -388,7 +418,8 @@ class Query
         $arrSqlBinds = $this->_genSqlBinds();
         $sql = $arrSqlBinds['sql'];
         $binds = $arrSqlBinds['binds'];
-        $rawData = $this->db->query($sql, $binds);
+        try { $rawData = $this->db->query($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->_afterRequest($rawData, false, $sql, $binds, $startQuery);
         return $rawData;
     }
@@ -413,7 +444,8 @@ class Query
         $startQuery = microtime(true);
         $sqlData = $this->_decomposedParameters($parameters);
         $sql = "INSERT INTO $table ({$sqlData['columnSql']}) VALUES ({$sqlData['valueSql']})";
-        $result = $this->db->insert($sql, $sqlData['bind'], $table, $primaryKey);
+        try { $result = $this->db->insert($sql, $sqlData['bind'], $table, $primaryKey); }
+        catch (\Exception $e) { $this->_error($e, $sql, $sqlData['bind']); }
         $this->_afterRequest($result, false, $sql, $sqlData['bind'], $startQuery);
         return (is_array($result) && $primaryKey) ? $result[$primaryKey] : $result;
     }
@@ -427,11 +459,14 @@ class Query
         $sqlData = $this->_decomposedParameters($parameters);
         $sql = "UPDATE $table SET {$sqlData['forUpdate']} WHERE ". $wh->getSql();
         $binds = array_merge($sqlData['bind'], $wh->getBind());
-        $this->db->query($sql, $binds);
+        try { $this->db->query($sql, $binds); }
+        catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $updateLinesSql = "SELECT * FROM $table WHERE " . $wh->getSql();
         $startQuery2 = microtime(true);
-        $updateLines = $this->db->fetchAll($updateLinesSql, $wh->getBind());
+        try { $updateLines = $this->db->fetchAll($updateLinesSql, $wh->getBind()); }
+        catch (\Exception $e) { $this->_error($e, $updateLinesSql, $wh->getBind()); }
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $updateLinesSql,
             'binds' => $wh->getBind(),
             'timeQuery' => (microtime(true) - $startQuery2)
@@ -479,14 +514,17 @@ class Query
         $startQuery = microtime(true);
         $wh = $this->_genWhereForUpdateAndDelete($where, $union);
         $delLinesSql = "SELECT * FROM $table WHERE " . $wh->getSql();
-        $delLines = $this->db->fetchAll($delLinesSql, $wh->getBind());
+        try { $delLines = $this->db->fetchAll($delLinesSql, $wh->getBind()); }
+        catch (\Exception $e) { $this->_error($e, $delLinesSql, $wh->getBind()); }
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $delLinesSql,
             'binds' => $wh->getBind(),
             'timeQuery' => (microtime(true) - $startQuery)
         ];
         $sql = "DELETE FROM $table WHERE " . $wh->getSql();
-        $this->db->query($sql, $wh->getBind());
+        try { $this->db->query($sql, $wh->getBind()); }
+        catch (\Exception $e) { $this->_error($e, $sql, $wh->getBind()); }
         $this->_afterRequest($delLines, false, $sql, $wh->getBind(), $startQuery);
         return $delLines;
     }
@@ -646,6 +684,154 @@ class Query
 
 
 
+    // ---------- whereWithJoin ----------
+    public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union = null, $whereMore = null)
+    {
+        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
+        $this->_validWhereWithJoin($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore);
+        $cJn = new CollectionJoin($this->settings);
+        $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
+        if (is_string($union)) {
+            if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+            else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
+        }
+        $this->_where($aliasWhere, $where, $isWhere = true);
+        $this->join($aliasJoin, $cJn);
+        return $this;
+    }
+
+    private function _validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore)
+    {
+        if (!is_string($aliasWhere) || !is_string($aliasJoin) || !is_array($options) || !$this->isClass($where, 'Where')) {
+            throw new \Exception('Параметры aliasWhere и aliasJoin должны быть строкой, options далжен быть массивом, а where должен быть экземпляром класса Where.');
+        }
+        if ($union) {
+            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
+                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
+            }
+            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
+        }
+    }
+
+    private function _whereWithJoin(&$cJn, $whRaw, $options)
+    {
+        $rez = [];
+        foreach ($whRaw as $wr) {
+            if (!is_string($wr)) {
+                if (is_array($wr[0])) {
+                    $rez[] = $this->_whereWithJoin($cJn, $wr, $options);
+                } else {
+                    if (array_key_exists($wr[0], $options)) {
+                        $table = $options[$wr[0]][0];
+                        $column = $options[$wr[0]][1];
+                        $outColumn = $options[$wr[0]][2];
+                        $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
+                        $buf = explode('.', $wr[0]);
+                        if (count($buf) > 1) $wr[0] = $aliasTable . '.' . $buf[1];
+                        else $wr[0] = $aliasTable . '.' . $wr[0];
+                        $rez[] = $wr;
+                    } else $rez[] = $wr;
+                }
+            } else $rez[] = $wr;
+        }
+        return $rez;
+    }
+    // ---------- end whereWithJoin ----------
+
+
+
+    // ---------- whereFromDetailedSearch ----------
+    public function whereFromDetailedSearch($aliasWhere, $searchQuery, $aliasJoin = null, $options = null, $union = null, $whereMore = null)
+    {
+        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
+        $this->_validWhereFromDetailedSearch($aliasWhere, $searchQuery, $union, $whereMore);
+        $where = new Where($this->settings);
+        $arrWhere = [];
+        foreach ($searchQuery as $sqBlock) {
+            $arrWhere[] = $this->_dsLines($sqBlock);
+        }
+        $where->linkAnd($arrWhere);
+        if ($aliasJoin && $options) {
+            $this->whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
+        } else {
+            if (is_string($union)) {
+                if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+                else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
+            }
+            $this->_where($aliasWhere, $where, $isWhere = true);
+        }
+        return $this;
+    }
+
+    private function _dsLines($sqBlock)
+    {
+        $where = new Where($this->settings);
+        $arrWhere = [];
+        foreach ($sqBlock as $sqLine) {
+            $arrWhere[] = $this->_dsLogicalOperations($sqLine);
+        }
+        return $where->linkOr($arrWhere)->getRaw();
+    }
+
+    private function _dsLogicalOperations($sqLine)
+    {
+        $type = $sqLine['identifier']['type'];
+        $column = $sqLine['identifier']['column'];
+        $secondColumns = $sqLine['identifier']['secondColumns'];
+        $objWhere = new Where($this->settings);
+        // --- генерируем основную часть where ---
+        $rawWhere = [$column];
+        if ($type == 'text') {
+            if (isset($sqLine['exclude'])) $rawWhere = $objWhere->notFlex($column, $sqLine['exclude']);
+            else $rawWhere = $objWhere->flex($column, $sqLine['value']);
+        } else {
+            if (isset($sqLine['exclude'])) {
+                $rawWhere[1] = ' <> ';
+                $rawWhere[2] = $sqLine['exclude'];
+            } else if (isset($sqLine['value'])) {
+                $rawWhere[1] = ' = ';
+                $rawWhere[2] = $sqLine['value'];
+            } else if (isset($sqLine['start']) && isset($sqLine['end'])) {
+                $rawWhere[1] = ' between ';
+                // Если string, то считается что это дата и добавляется sql функция преобразования к дате
+                $rawWhere[2] = $type == 'number' ? (int)$sqLine['start'] : (string)$sqLine['start'];
+                $rawWhere[3] = $type == 'number' ? (int)$sqLine['end'] : (string)$sqLine['end'];
+            } else {
+                if (isset($sqLine['start'])) {
+                    $rawWhere[1] = ' >= ';
+                    $rawWhere[2] = $sqLine['start'];
+                } else if (isset($sqLine['end'])) {
+                    $rawWhere[1] = ' <= ';
+                    $rawWhere[2] = $sqLine['end'];
+                }
+            }
+        }
+        // -----
+        $arrWhere = [$rawWhere];
+        if (isset($secondColumns) && count($secondColumns)) {
+            foreach ($secondColumns as $cl => $val) {
+                $arrWhere[] = [$cl, '=', $val];
+            }
+        }
+        return $objWhere->linkAnd($arrWhere)->getRaw();
+    }
+
+    private function _validWhereFromDetailedSearch($aliasWhere, $searchQuery, $union, $whereMore)
+    {
+        if (!is_string($aliasWhere) || !is_array($searchQuery)) {
+            throw new \Exception('Параметр aliasWhere должен быть строкой, а searchQuery должен быть массивом.');
+        }
+        if ($union) {
+            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
+                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
+            }
+            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
+        }
+    }
+    // ---------- end whereFromDetailedSearch ----------
+
+
+
     public function debugInfo()
     {
         return $this->debugInfo;
@@ -663,6 +849,7 @@ class Query
         $this->paginationLastRequest = $this->pagination;
         $this->pagination = false;
         $this->debugInfo[] = [
+            'type' => 'info',
             'sql' => $sql,
             'binds' => $binds,
             'timeQuery' => (microtime(true) - $timeStartQuery)
@@ -671,92 +858,15 @@ class Query
 
 
 
-    public function smartWhere($aliasWhere, $aliasJoin, $options, $where, $union = null, $whereMore = null)
+    private function _error($ex, $sql, $binds)
     {
-        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
-        $this->_validSmartWhere($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore);
-        $cJn = new CollectionJoin($this->settings);
-        $where->setRaw( $this->_smartWhere($cJn, $where->getRaw(), $options) );
-        if (is_string($union)) {
-            if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
-            else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
-        }
-        $this->_where($aliasWhere, $where, $isWhere = true);
-        $this->join($aliasJoin, $cJn);
-        return $this;
+        $this->debugInfo[] = [
+            'type' => 'error',
+            'exception' => $ex,
+            'sql' => $sql,
+            'binds' => $binds
+        ];
+        throw new \Exception('Ошибка при обращении к БД, SQL: '. $sql);
     }
-
-    private function _validSmartWhere($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore)
-    {
-        if (!is_string($aliasWhere) || !is_string($aliasJoin) || !is_array($options) || !$this->isClass($where, 'Where')) {
-            throw new \Exception('Параметры aliasWhere и aliasJoin должны быть строкой, options далжен быть массивом, а where должен быть экземпляром класса Where.');
-        }
-        if ($union) {
-            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
-                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
-            }
-            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
-        }
-    }
-
-    private function _smartWhere(&$cJn, $whRaw, $options)
-    {
-        // В теории внутри скобки только один знак OR или AND, но проверяем на случий, если была ошибка
-        // или правили сырое выражение руками.
-        $isOr = false;
-        $isAnd = false;
-        $arrColumns = [];
-        foreach ($whRaw as $wr) {
-            if (is_string($wr)) {
-                $union = mb_strtolower(trim($wr));
-                if ($union == 'or') $isOr = true;
-                if ($union == 'and') $isAnd = true;
-            }
-            if (is_array($wr) && is_string($wr[0])) $arrColumns[] = $wr[0];
-        }
-        if ($isOr && $isAnd) throw new \Exception('В рамках одной скобки связь может быть или только AND или только OR.');
-        $arrColumns = array_count_values($arrColumns);
-        // ---
-        $rez = [];
-        foreach ($whRaw as $wr) {
-            if (!is_string($wr)) {
-                if (is_array($wr[0])) {
-                    $rez[] = $this->_smartWhere($cJn, $wr, $options);
-                } else {
-                    if ($isAnd && $arrColumns[$wr[0]] > 1) {
-                        $table = $options[$wr[0]][0];
-                        $column = $options[$wr[0]][1];
-                        $outColumn = $options[$wr[0]][2];
-                        $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
-                        $buf = explode('.', $wr[0]);
-                        if (count($buf) > 1) $wr[0] = $aliasTable . '.' . $buf[1];
-                        else $wr[0] = $aliasTable . '.' . $wr[0];
-                        $rez[] = $wr;
-                    } else $rez[] = $wr;
-                }
-            } else $rez[] = $wr;
-        }
-        return $rez;
-    }
-
-//    private function _smartWhere(&$cJn, $whRaw, $options)
-//    {
-//        $rez = [];
-//        foreach ($whRaw as $wr) {
-//            if (!is_string($wr)) {
-//                if (is_array($wr[0])) {
-//                    $rez[] = $this->_smartWhere($cJn, $wr, $options);
-//                } else {
-//                    $table = $options[$wr[0]][0];
-//                    $column = $options[$wr[0]][1];
-//                    $outColumn = $options[$wr[0]][2];
-//                    $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
-//                    $wr[0] = $aliasTable . '.' . $wr[0];
-//                    $rez[] = $wr;
-//                }
-//            } else $rez[] = $wr;
-//        }
-//        return $rez;
-//    }
 
 }

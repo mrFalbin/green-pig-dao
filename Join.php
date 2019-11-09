@@ -13,13 +13,7 @@ class Join extends Where
     private $mergeMethod;
 
 
-    public function __construct($settings)
-    {
-        parent::__construct($settings);
-    }
-
-
-    public function init($mergeMethod, $table, $column, $outColumn)
+    public function __construct($settings, $mergeMethod, $table, $column, $outColumn)
     {
         $this->mergeMethod = trim($mergeMethod);
         $this->alias = $table .'_'. $this->genStr();
@@ -27,7 +21,7 @@ class Join extends Where
         $this->column = $column;
         $this->outColumn = $outColumn;
         $this->rawBasicIf = [$this->alias .'.'. $this->column, '=', 'sql' => $this->outColumn];
-        return $this;
+        parent::__construct($settings);
     }
 
 

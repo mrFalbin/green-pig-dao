@@ -76,7 +76,7 @@ class Where
 			$count = count($expression);
 			for ($i = 0; $i < $count; $i++) {
 				if ($i < ($count-1)) {
-					$this->rawWhere[] = $expression[$i];   
+					$this->rawWhere[] = $expression[$i];
 					$this->rawWhere[] = $union;
 				} else $this->rawWhere[] = $expression[$i];
 			}
@@ -84,23 +84,37 @@ class Where
 	}
 
 
-	public function fullFlex($column, $value) 
+	public function fullFlex($column, $value)
 	{
 		return $this->flex($column, "*$value*");
 	}
 
 
-	public function flex($column, $value) 
-	{
-		$value = $this->repStar($value);
+    public function flex($column, $value)
+    {
+        return $this->_flex($column, $value, false);
+    }
+
+
+    public function notFlex($column, $value)
+    {
+        return $this->_flex($column, $value, true);
+    }
+
+
+    private function _flex($column, $value, $isNot)
+    {
+        $not = $isNot ? ' not ' : '';
+        $value = $this->repStar($value);
         $alias = 'al_where_'.  $this->genStr();
         return [
             "LOWER($column)",
-            'like',
+            "$not like",
             'sql'  => "LOWER(:$alias)",
             'bind' => ["$alias" => $value]
         ];
-	}
+    }
+
 
 
     /**
@@ -125,7 +139,7 @@ class Where
         $this->_genWhere($this->rawWhere);
         return $this;
     }
-    
+
 
    // -------------------------------- Вспомогательные приватные функции для genWhere ---------------------------------
    private function _genWhere($rawWhere)
