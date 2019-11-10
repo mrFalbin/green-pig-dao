@@ -4,8 +4,9 @@ namespace GreenPigDAO;
 /**
  *  author:        Falbin
  *  email:         ifalbin@yandex.ru
- *  homepage:      http://falbin.ru
+ *  homepage:      https://falbin.ru
  *  documentation: https://falbin.ru/documentation/greenpig
+ *  github:        https://github.com/mrFalbin/green-pig-dao
  *
  *                             ╔═══╗╔═══╗╔═══╗╔═══╗╔╗─╔╗────╔═══╗╔══╗╔═══╗
  *                             ║╔══╝║╔═╗║║╔══╝║╔══╝║╚═╝║────║╔═╗║╚╗╔╝║╔══╝

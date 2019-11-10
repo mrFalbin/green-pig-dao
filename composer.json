@@ -3,7 +3,6 @@
     "type": "library",
     "description": "database assistant",
     "keywords": ["oracle", "mysql", "database", "orm", "dao"],
-    "homepage": "http://doc.falbin.ru/greenpig/",
     "license": "MIT",
     "minimum-stability": "beta",
     "authors": [
@@ -14,6 +13,11 @@
             "role": "Developer"
         }
     ],
+    "support": {
+        "email": "ifalbin@yandex.ru",
+        "docs": "https://falbin.ru/documentation/greenpig",
+        "source": "https://github.com/mrFalbin/green-pig-dao"
+    },
     "require": {
         "php": ">=5.4.0"
     },
