@@ -689,7 +689,7 @@ class Query
     public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union = null, $whereMore = null)
     {
         if ($union && is_string($union)) $union = mb_strtolower(trim($union));
-        $this->_validWhereWithJoin($aliasWhere, $aliasJoin, $options, $where, $union, $whereMore);
+        $this->_validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
         $cJn = new CollectionJoin($this->settings);
         $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
         if (is_string($union)) {
@@ -716,24 +716,54 @@ class Query
 
     private function _whereWithJoin(&$cJn, $whRaw, $options)
     {
+        // В теории внутри скобки только один знак OR или AND, но проверяем на случий, если была ошибка
+        // или правили сырое выражение руками.
+        $isOr = false;
+        $isAnd = false;
+        $arrColumns = [];
+        foreach ($whRaw as $wr) {
+            if (is_string($wr)) {
+                $union = mb_strtolower(trim($wr));
+                if ($union == 'or') $isOr = true;
+                if ($union == 'and') $isAnd = true;
+            }
+        }
+        if ($isOr && $isAnd) throw new \Exception('В рамках одной скобки связь может быть или только AND или только OR.');
+        $arrJoin = []; // Массив джойнов в рамках 1ой скобки
         $rez = [];
         foreach ($whRaw as $wr) {
             if (!is_string($wr)) {
                 if (is_array($wr[0])) {
                     $rez[] = $this->_whereWithJoin($cJn, $wr, $options);
                 } else {
-                    if (array_key_exists($wr[0], $options)) {
-                        $table = $options[$wr[0]][0];
-                        $column = $options[$wr[0]][1];
-                        $outColumn = $options[$wr[0]][2];
-                        $aliasTable = $cJn->addNew('inner', $table, $column, $outColumn);
-                        $buf = explode('.', $wr[0]);
-                        if (count($buf) > 1) $wr[0] = $aliasTable . '.' . $buf[1];
-                        else $wr[0] = $aliasTable . '.' . $wr[0];
-                        $rez[] = $wr;
+                    // Если в рамках 1ой скобки связь AND
+                    if ($isAnd) {
+                        $alias = false;
+                        foreach ($options as $al => $val) {
+                            if (preg_match("/(^|\W)$al\./", $wr[0])) $alias = $al;
+                        }
+                        // Проверяем нужно ли для данной таблицы делать join
+                        if ($alias) {
+                            // Проверяем сделан ли уже join для данной таблицы внутри даннорй скобки
+                            if (!array_key_exists($alias, $arrJoin)) {
+                                $table = $options[$alias][0];
+                                $column = $options[$alias][1];
+                                $outColumn = $options[$alias][2];
+                                $arrJoin[$alias] = new Join($this->settings, 'inner', $table, $column, $outColumn);
+                            }
+                            $newAlias = $arrJoin[$alias]->getAlias();
+                            // Если алиас у таблицы, скажем r (из $options), то при замене в переменной $wr[0], которая
+                            // может принять значение "lower(r.verb_1)", замена будет в 3х местах (loweR(R.veRb_1)).
+                            // Поэтому в замену включаем точку.
+                            $wr[0] = preg_replace("/$alias\./", $newAlias . '.', $wr[0]);
+                            $rez[] = $wr;
+                        } else $rez[] = $wr;
                     } else $rez[] = $wr;
                 }
             } else $rez[] = $wr;
+        }
+        foreach ($arrJoin as $al => $join) {
+            $cJn->add($join);
         }
         return $rez;
     }
