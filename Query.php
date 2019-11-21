@@ -148,19 +148,14 @@ class Query
 
 
 
-    public function where($alias, $where)
-    {
-        $this->_where($alias, $where);
-        return $this;
-    }
-
-    private function _where($alias, $where, $isWhere = false)
+    public function where($alias, $where, $isWhere = false)
     {
         if (!$this->isClass($where, 'Where')) throw new \Exception('Параметр where должен быть экземпляром класса Where.');
         if (!$where->getSql()) $where->generate();
         $sql = $isWhere ? ' WHERE ' : '';
         $sql .= $where->getSql();
         if ($where->getSql()) $this->sqlPart($alias, $sql, $where->getBind());
+        return $this;
     }
 
 
@@ -247,7 +242,6 @@ class Query
     {
         // Сортировка должна быть во внешнем запросе, если сортировка находится внутри,
         // то Oracle не гарантирует ее соблюдение.
-        $startQuery = microtime(true);
         $arrSqlBinds = $this->_genSqlBinds();
         $sql = $arrSqlBinds['sql'];
         $binds = $arrSqlBinds['binds'];
@@ -262,6 +256,7 @@ class Query
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable ORDER BY ". implode(",", $this->sort);
             $aggregateData = [];
             try {
+                $startQuery = microtime(true);
                 $rawData = $this->db->fetchAll($sql, $binds);
                 $aggregateData = $this->aggregator($options, $rawData);
                 $this->_afterRequest($rawData, $aggregateData, $sql, $binds, $startQuery);
@@ -277,6 +272,7 @@ class Query
             $aliasTable1 = "table_" . $this->genStr();
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable1 ORDER BY ". implode(",", $this->sort);
             try {
+                $startQuery = microtime(true);
                 $rawData = $this->db->fetchAll($sql, $binds);
                 $this->_afterRequest($rawData, false, $sql, $binds, $startQuery);
                 return $rawData;
@@ -288,7 +284,15 @@ class Query
     {
         $aliasTable1 = "table_" . $this->genStr();
         try {
-            $result = $this->db->fetchRow("SELECT COUNT(distinct $aliasTable1.$pk) as total_count FROM ( $sql ) $aliasTable1", $binds);
+            $timeStartQuery = microtime(true);
+            $sqlCount = "SELECT COUNT(distinct $aliasTable1.$pk) as total_count FROM ( $sql ) $aliasTable1";
+            $result = $this->db->fetchRow($sqlCount, $binds);
+            $this->debugInfo[] = [
+                'type' => 'info',
+                'sql' => $sqlCount,
+                'binds' => $binds,
+                'timeQuery' => (microtime(true) - $timeStartQuery)
+            ];
         } catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         //  В зависимости от настройки БД она может вернуть данные, приведя название колонок к нижнему или верхнему
         // регистру. Нам нужен первый (в данном случае единственный) столбец.
@@ -318,10 +322,12 @@ class Query
         $aliasIndexStart = ':indexStart_'. $this->genStr();
         $aliasindexEnd = ':indexEnd_'. $this->genStr();
         $sql = "select * from (
-                  select rownum rnum, $primaryKey from (
-                    select $primaryKey from ($sql) group by $primaryKey $sqlOB
+                  select rownum, $primaryKey from (                  
+                    select $primaryKey from (
+                       select * from ($sql) $sqlOB
+                    ) group by $primaryKey 
                   )
-                ) where rnum >= $aliasIndexStart and rnum < $aliasindexEnd";
+                ) where rownum >= $aliasIndexStart and rownum < $aliasindexEnd";
         $binds = array_merge($binds, [$aliasIndexStart => $indexStart,
             $aliasindexEnd => $indexEnd]);
         try { $result = $this->db->fetchAll($sql, $binds); }
@@ -333,7 +339,11 @@ class Query
             'timeQuery' => (microtime(true) - $timeStartQuery)
         ];
         $resultFinal = [];
-        foreach ($result as $r) $resultFinal[] = $r[$primaryKey];
+        $primaryKey = mb_strtolower($primaryKey);
+        foreach ($result as $r) {
+            $r = array_change_key_case($r, CASE_LOWER);
+            $resultFinal[] = $r[$primaryKey];
+        }
         return $resultFinal;
     }
 
@@ -344,7 +354,12 @@ class Query
         $indexStart--;
         $aliasIndexStart = ':indexStart_'. $this->genStr();
         $aliasNumberRowOnPage = ':numberRowOnPage_'. $this->genStr();
-        $sql = "select $primaryKey from ($sql) $aliasTable group by $primaryKey limit $aliasIndexStart, $aliasNumberRowOnPage";
+        $sqlOB = '';
+        if ($this->sort) $sqlOB = "  ORDER BY ". implode(",", $this->sort);
+        $sql = "select $primaryKey from ($sql) $aliasTable 
+                group by $primaryKey 
+                $sqlOB 
+                limit $aliasIndexStart, $aliasNumberRowOnPage";
         $binds = array_merge($binds, [$aliasIndexStart => $indexStart,
             $aliasNumberRowOnPage => $numberRowOnPage]);
         try { $result = $this->db->fetchAll($sql, $binds); }
@@ -355,8 +370,12 @@ class Query
             'binds' => $binds,
             'timeQuery' => (microtime(true) - $timeStartQuery)
         ];
+        $primaryKey = mb_strtolower($primaryKey);
         $resultFinal = [];
-        foreach ($result as $r) $resultFinal[] = $r[$primaryKey];
+        foreach ($result as $r) {
+            $r = array_change_key_case($r, CASE_LOWER);
+            $resultFinal[] = $r[$primaryKey];
+        }
         return $resultFinal;
     }
 
@@ -696,7 +715,7 @@ class Query
             if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
             else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
         }
-        $this->_where($aliasWhere, $where, $isWhere = true);
+        $this->where($aliasWhere, $where, $isWhere = true);
         $this->join($aliasJoin, $cJn);
         return $this;
     }
@@ -771,7 +790,7 @@ class Query
 
 
 
-    // ---------- whereFromDetailedSearch ----------
+    // ---------- whereFromDetailedSearch (для плагина https://www.npmjs.com/package/detailed-search) ----------
     public function whereFromDetailedSearch($aliasWhere, $searchQuery, $aliasJoin = null, $options = null, $union = null, $whereMore = null)
     {
         if ($union && is_string($union)) $union = mb_strtolower(trim($union));
@@ -789,7 +808,7 @@ class Query
                 if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
                 else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
             }
-            $this->_where($aliasWhere, $where, $isWhere = true);
+            $this->where($aliasWhere, $where, $isWhere = true);
         }
         return $this;
     }
