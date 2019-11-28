@@ -553,14 +553,19 @@ class Query
 
     private function _genWhereForUpdateAndDelete($where, $union)
     {
-        if (($union === null) && $this->isClass($where, 'Where')) {
-            $wh = $where;
-            if (!$wh->getSql()) $wh->generate();
-            if (!$wh->getSql()) throw new \Exception('Параметр where не может быть пустым.');
+        $wh = new Where($this->settings);
+        if ($union === null) {
+            if (is_array($where)) {
+                if (is_array($where[0])) throw new \Exception('Не передан параметр union.');
+                else $wh->linkAnd($where)->generate();
+            } else if ($this->isClass($where, 'Where')) {
+                $wh = $where;
+                if (!$wh->getSql()) $wh->generate();
+                if (!$wh->getSql()) throw new \Exception('Параметр where не может быть пустым.');
+            } else throw new \Exception('Параметр where должен быть либо экземпляром класса Where, либо массивом (массив логических операций).');
         } elseif (is_string($union) && is_array($where)) {
             $union = mb_strtolower(trim($union));
             if (!($union == 'and' || $union == 'or' )) throw new \Exception('union должна принимать значение либо OR либо AND.');
-            $wh = new Where($this->settings);
             if ($union == 'and') $wh->linkAnd($where)->generate();
             else $wh->linkOr($where)->generate();
         } else throw new \Exception('WHERE часть задается либо только переменной where, которая является экземпляром класса Where, либо массивом where (массив логических операций) и строкой union (должна быть либо OR либо AND).');
@@ -705,32 +710,16 @@ class Query
 
 
     // ---------- whereWithJoin ----------
-    public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union = null, $whereMore = null)
-    {
-        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
-        $this->_validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
-        $cJn = new CollectionJoin($this->settings);
-        $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
-        if (is_string($union)) {
-            if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
-            else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
-        }
-        $this->where($aliasWhere, $where, $isWhere = true);
-        $this->join($aliasJoin, $cJn);
-        return $this;
-    }
-
-    private function _validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore)
+    public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where)
     {
         if (!is_string($aliasWhere) || !is_string($aliasJoin) || !is_array($options) || !$this->isClass($where, 'Where')) {
             throw new \Exception('Параметры aliasWhere и aliasJoin должны быть строкой, options далжен быть массивом, а where должен быть экземпляром класса Where.');
         }
-        if ($union) {
-            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
-                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
-            }
-            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
-        }
+        $cJn = new CollectionJoin($this->settings);
+        $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
+        $this->where($aliasWhere, $where, $isWhere = true);
+        $this->join($aliasJoin, $cJn);
+        return $this;
     }
 
     private function _whereWithJoin(&$cJn, $whRaw, $options)
@@ -801,13 +790,11 @@ class Query
             $arrWhere[] = $this->_dsLines($sqBlock);
         }
         $where->linkAnd($arrWhere);
+        if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+        if ($union == 'or')  $where->linkOr([$where->getRaw(),  $whereMore->getRaw()]);
         if ($aliasJoin && $options) {
-            $this->whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
+            $this->whereWithJoin($aliasJoin, $options, $aliasWhere, $where);
         } else {
-            if (is_string($union)) {
-                if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
-                else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
-            }
             $this->where($aliasWhere, $where, $isWhere = true);
         }
         return $this;

@@ -15,7 +15,11 @@ class Join extends Where
 
     public function __construct($settings, $mergeMethod, $table, $column, $outColumn)
     {
-        $this->mergeMethod = trim($mergeMethod);
+        $mm = mb_strtolower(trim($mergeMethod));
+        if (!($mm == 'inner' || $mm == 'left' || $mm == 'right' || $mm == 'full' || $mm == 'cross')) {
+            throw new \Exception('mergeMethod может принимать только одно из следующих значений: inner, left, right, full, cross');
+        }
+        $this->mergeMethod = $mm;
         $this->alias = $table .'_'. $this->genStr();
         $this->table = $table;
         $this->column = $column;
@@ -27,17 +31,14 @@ class Join extends Where
 
     public function linkAnd($expression)
     {
-        // $this->rawWhere = [$this->rawBasicIf, 'and', parent::linkAnd($expression)->getRaw()];
-        parent::linkAnd([$this->rawBasicIf,
-                         parent::linkAnd($expression)->getRaw()]);
+        parent::linkAnd([$this->rawBasicIf, parent::linkAnd($expression)->getRaw()]);
         return $this;
     }
 
 
     public function linkOr($expression)
     {
-        parent::linkOr([$this->$expression,
-                        parent::linkOr($expression)->getRaw()]);
+        parent::linkOr([$this->$expression, parent::linkOr($expression)->getRaw()]);
         return $this;
     }
 

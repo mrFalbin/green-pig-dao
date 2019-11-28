@@ -19,8 +19,7 @@ class CollectionJoin
 
     public function addNew($mergeMethod, $table, $column, $outColumn)
     {
-        $join = new Join($this->settings);
-        $join->init($mergeMethod, $table, $column, $outColumn);
+        $join = new Join($this->settings, $mergeMethod, $table, $column, $outColumn);
         $this->collection[$join->getAlias()] = $join;
         return $join->getAlias();
     }
@@ -28,6 +27,9 @@ class CollectionJoin
 
     public function add($join)
     {
+        if (!$this->isClass($join, 'Join')) {
+            throw new \Exception('Параметр join должен быть экземпляром класса Join.');
+        }
         $this->collection[$join->getAlias()] = $join;
         return $join->getAlias();
     }
