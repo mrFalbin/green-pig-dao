@@ -34,6 +34,7 @@ trait BaseFunctions
 
     public function isClass($object, $nameClass)
     {
+        if (!is_object($object)) return false;
         $classObject = get_class($object);
         $classObject = substr($classObject, strrpos($classObject, '\\') + 1);
         return $classObject === $nameClass;
