@@ -267,7 +267,7 @@ class Query
             // --- Если $options - строка, то это PK для пагинации ---
             if (is_string($options) && is_array($this->pagination)) {
                 $sql = $this->_processingPagination($options, $sql, $binds);
-                if (!$sql) return false; // пустая выборка при пагинации
+                if ($sql === false) return []; // пустая выборка при пагинации   (важное изменение c false на [])
             }
             $aliasTable1 = "table_" . $this->genStr();
             if ($this->sort) $sql = "SELECT * FROM ($sql) $aliasTable1 ORDER BY ". implode(",", $this->sort);
@@ -280,7 +280,7 @@ class Query
         }
     }
 
-    private function _processingPagination($pk, $sql, $binds)
+    private function _processingPagination($pk, $sql, &$binds)
     {
         $aliasTable1 = "table_" . $this->genStr();
         try {
@@ -307,7 +307,12 @@ class Query
         elseif (trim(strtolower($this->settings['nameDatabase'])) == 'mysql') $arrPkResultRequest = $this->_fetchPKsMySql($sql, $binds, $pk, $indexStart, $numberRowOnPage);
         else throw new \Exception('В settings неверно указано название базы данных.');
         $aliasTable2 = "table_" . $this->genStr();
-        $sql = "SELECT * FROM ($sql) $aliasTable2 WHERE $pk IN (". implode(",", $arrPkResultRequest) .")";
+        // ----- !!!!!!!!!!!!!!!!!!!!!!!
+        $wh = new Where($this->settings);
+        $wh->linkAnd([$pk, 'in', $arrPkResultRequest])->generate();
+        $sql = "SELECT * FROM ($sql) $aliasTable2 WHERE ". $wh->getSql();
+        $binds = array_merge($binds, $wh->getBind());
+        // ---
         return count($arrPkResultRequest) ? $sql : false;
     }
 
@@ -316,20 +321,45 @@ class Query
     private function _fetchPKsOracle($sql, $binds, $primaryKey, $indexStart, $numberRowOnPage)
     {
         $timeStartQuery = microtime(true);
-        $sqlOB = '';
-        if ($this->sort) $sqlOB = "  ORDER BY ". implode(",", $this->sort);
+        $primaryKey = trim(strtolower($primaryKey));
+        $sqlOrderBy = '';
+        $sqlSelectOrGroup = '';
+        //     В случае агрегированного запроса в массиве sort НЕ могут быть колонки из вложенных    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //     параметров, сортировать можно только по значениям из первого уровня.
+        //     1) Из массива sort получить все колонки для сортировки
+        //     2) Удалить из них desc
+        //     3) Удалить из них колонку первичного ключа, если есть
+        //     4) Сформировать строку для select и group
+        //     5) Cформировать строку для sort
+        if ($this->sort) {
+            // Используя цикл:
+            // 1) Избегаем удаление desc из начала названия колонки
+            // 2) Избегаем неоднозначности с primaryKey (есть запятая после, нет или сначало N пробелов)
+            // и т.д.
+            foreach ($this->sort as $srt) {
+                $buf = trim(strtolower($srt));
+                if ($sqlOrderBy) $sqlOrderBy .= ", $buf";
+                else $sqlOrderBy = $buf;
+                $buf = trim(str_replace(' desc', '', $buf));
+                if ($primaryKey !== $buf) $sqlSelectOrGroup .= ", $buf";
+            }
+            if ($sqlOrderBy) $sqlOrderBy = " ORDER BY $sqlOrderBy";
+        }
         $indexEnd = $indexStart + $numberRowOnPage;
         $aliasIndexStart = ':indexStart_'. $this->genStr();
         $aliasindexEnd = ':indexEnd_'. $this->genStr();
-        $sql = "select * from (
-                  select rownum, $primaryKey from (                  
-                    select $primaryKey from (
-                       select * from ($sql) $sqlOB
-                    ) group by $primaryKey 
-                  )
-                ) where rownum >= $aliasIndexStart and rownum < $aliasindexEnd";
-        $binds = array_merge($binds, [$aliasIndexStart => $indexStart,
-            $aliasindexEnd => $indexEnd]);
+        $sql = "select $primaryKey from (
+                     /* необходима дополнительная обертка, т.к. rownum_qyXzTempJR >= 2 всегда будет выдавать пустое множество 
+                        (без псевдонима (rownum_qyXzTempJR) не работает) */
+                     select rownum rownum_qyXzTempJR, $primaryKey $sqlSelectOrGroup from (                  
+                         select $primaryKey $sqlSelectOrGroup from ($sql)  
+                         group by $primaryKey $sqlSelectOrGroup
+                         $sqlOrderBy
+                     ) /* тут сортировка не имеет ссмысла, т.к. во-первых она уже не повлияет на значения нумерации, 
+                          во-вторых у и так правильная нумерация, на основе вложенной выборки */
+                ) where rownum_qyXzTempJR >= $aliasIndexStart and rownum_qyXzTempJR < $aliasindexEnd
+                ";
+        $binds = array_merge($binds, [$aliasIndexStart => $indexStart, $aliasindexEnd => $indexEnd]);
         try { $result = $this->db->fetchAll($sql, $binds); }
         catch (\Exception $e) { $this->_error($e, $sql, $binds); }
         $this->debugInfo[] = [
@@ -339,7 +369,6 @@ class Query
             'timeQuery' => (microtime(true) - $timeStartQuery)
         ];
         $resultFinal = [];
-        $primaryKey = mb_strtolower($primaryKey);
         foreach ($result as $r) {
             $r = array_change_key_case($r, CASE_LOWER);
             $resultFinal[] = $r[$primaryKey];
@@ -377,6 +406,79 @@ class Query
             $resultFinal[] = $r[$primaryKey];
         }
         return $resultFinal;
+    }
+
+
+
+// === БУДЕТ ===
+// Функция all() не будет выдавать агрегированные запросы. В качестве параметра будет только строка
+// (название первичного ключа) для пагинации. Результат выборки:
+//[
+//    0 => [
+//        'id' => 3,
+//        'name' => 'Паша',
+//        'title_id' => 6,
+//        'title' => '«Азы» программирования и обучающие программы',
+//    ],
+//    1=> [
+//        'id' => 3,
+//        'name' => 'Паша',
+//        'title_id' => 7,
+//        'title' => 'История возникновения Интернет'
+//    ]
+//]
+//
+//
+// Для выборки с агрегацией по старому правилу (в качестве ключей массива - PK) нужно будет использовать
+// функцию allAggregatorKeyPK()  (сейчас пока функция all() ). Результат выборки:
+//[
+//    3 => [
+//        'name' => 'Паша',
+//        'courseworks' => [
+//            6 => ['title' => '«Азы» программирования и обучающие программы'],
+//            7 => ['title' => 'История возникновения Интернет']
+//        ]
+//    ]
+//]
+//
+// Для выборки с агрегацией по новому правилу (обычный одномерный массив с ассоциативными массивами, удобно для JS
+// фреймворков, типа Vue) нужно будет использовать функцию allAggregator(). Результат выборки:
+//[
+//    0 => [
+//        'id' => 3,
+//        'name' => 'Паша',
+//        'courseworks' => [
+//            0 => ['title_id' => 6, 'title' => '«Азы» программирования и обучающие программы'],
+//            1 => ['title_id' => 7, 'title' => 'История возникновения Интернет']
+//        ]
+//    ]
+//]
+    public function allAggregator($options)
+    {
+        if (!is_array($options)) throw new \Exception('Параметр options далжен быть массивом.');
+        $aggregateDataKeyPK = $this->all($options);
+        if (is_array($aggregateDataKeyPK) && count($aggregateDataKeyPK)) {          // count(false)  =>  1
+            $aggregateData = $this->_allAggregator($aggregateDataKeyPK, $options);
+            $this->aggregateData = $aggregateData;
+            return $aggregateData;
+        }
+        return [];
+    }
+
+    private function _allAggregator($aggregatorData, $options)
+    {
+        $pk = $this->_getPrimaryKeyForAggregator($options);
+        $result = [];
+        foreach ($aggregatorData as $pkVal => $arr) {
+            $buf = [];
+            $buf[$pk] = $pkVal;
+            foreach ($arr as $nameColumn => $val) {
+                if (is_array($val)) $buf[$nameColumn] = $this->_allAggregator($val, $options[$nameColumn]);
+                else $buf[$nameColumn] = $val;
+            }
+            $result[] = $buf;
+        }
+        return $result;
     }
 
 
@@ -553,19 +655,14 @@ class Query
 
     private function _genWhereForUpdateAndDelete($where, $union)
     {
-        $wh = new Where($this->settings);
-        if ($union === null) {
-            if (is_array($where)) {
-                if (is_array($where[0])) throw new \Exception('Не передан параметр union.');
-                else $wh->linkAnd($where)->generate();
-            } else if ($this->isClass($where, 'Where')) {
-                $wh = $where;
-                if (!$wh->getSql()) $wh->generate();
-                if (!$wh->getSql()) throw new \Exception('Параметр where не может быть пустым.');
-            } else throw new \Exception('Параметр where должен быть либо экземпляром класса Where, либо массивом (массив логических операций).');
+        if (($union === null) && $this->isClass($where, 'Where')) {
+            $wh = $where;
+            if (!$wh->getSql()) $wh->generate();
+            if (!$wh->getSql()) throw new \Exception('Параметр where не может быть пустым.');
         } elseif (is_string($union) && is_array($where)) {
             $union = mb_strtolower(trim($union));
             if (!($union == 'and' || $union == 'or' )) throw new \Exception('union должна принимать значение либо OR либо AND.');
+            $wh = new Where($this->settings);
             if ($union == 'and') $wh->linkAnd($where)->generate();
             else $wh->linkOr($where)->generate();
         } else throw new \Exception('WHERE часть задается либо только переменной where, которая является экземпляром класса Where, либо массивом where (массив логических операций) и строкой union (должна быть либо OR либо AND).');
@@ -710,16 +807,32 @@ class Query
 
 
     // ---------- whereWithJoin ----------
-    public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where)
+    public function whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union = null, $whereMore = null)
+    {
+        if ($union && is_string($union)) $union = mb_strtolower(trim($union));
+        $this->_validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
+        $cJn = new CollectionJoin($this->settings);
+        $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
+        if (is_string($union)) {
+            if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+            else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
+        }
+        $this->where($aliasWhere, $where, $isWhere = true);
+        $this->join($aliasJoin, $cJn);
+        return $this;
+    }
+
+    private function _validWhereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore)
     {
         if (!is_string($aliasWhere) || !is_string($aliasJoin) || !is_array($options) || !$this->isClass($where, 'Where')) {
             throw new \Exception('Параметры aliasWhere и aliasJoin должны быть строкой, options далжен быть массивом, а where должен быть экземпляром класса Where.');
         }
-        $cJn = new CollectionJoin($this->settings);
-        $where->setRaw( $this->_whereWithJoin($cJn, $where->getRaw(), $options) );
-        $this->where($aliasWhere, $where, $isWhere = true);
-        $this->join($aliasJoin, $cJn);
-        return $this;
+        if ($union) {
+            if (!is_string($union) || !$this->isClass($whereMore, 'Where')) {
+                throw new \Exception('Параметр whereMore должен быть экземпляром класса Where, а параметр union должен быть строкой.');
+            }
+            if (!($union == 'and' || $union == 'or')) throw new \Exception('union должна принимать значение либо OR либо AND');
+        }
     }
 
     private function _whereWithJoin(&$cJn, $whRaw, $options)
@@ -790,11 +903,13 @@ class Query
             $arrWhere[] = $this->_dsLines($sqBlock);
         }
         $where->linkAnd($arrWhere);
-        if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
-        if ($union == 'or')  $where->linkOr([$where->getRaw(),  $whereMore->getRaw()]);
         if ($aliasJoin && $options) {
-            $this->whereWithJoin($aliasJoin, $options, $aliasWhere, $where);
+            $this->whereWithJoin($aliasJoin, $options, $aliasWhere, $where, $union, $whereMore);
         } else {
+            if (is_string($union)) {
+                if ($union == 'and') $where->linkAnd([$where->getRaw(), $whereMore->getRaw()]);
+                else $where->linkOr([$where->getRaw(), $whereMore->getRaw()]);
+            }
             $this->where($aliasWhere, $where, $isWhere = true);
         }
         return $this;
@@ -812,9 +927,9 @@ class Query
 
     private function _dsLogicalOperations($sqLine)
     {
-        $type = $sqLine['identifier']['type'];
-        $column = $sqLine['identifier']['column'];
-        $secondColumns = $sqLine['identifier']['secondColumns'];
+        $type = $sqLine['info']['type'];
+        $column = $sqLine['info']['column'];
+        $secondColumns = $sqLine['info']['secondColumns'];
         $objWhere = new Where($this->settings);
         // --- генерируем основную часть where ---
         $rawWhere = [$column];
